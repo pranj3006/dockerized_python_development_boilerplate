@@ -1,0 +1,148 @@
+version: '3.8'
+
+networks:
+  dockerize_devlopment_app1_network:
+
+services:
+  dockerize_devlopment_app1_redis:
+    image: "redis:alpine"
+    container_name: dockerize_devlopment_app1_redis
+    ports:
+      - "6380:6379"
+    networks:
+      - dockerize_devlopment_app1_network
+
+  dockerize_devlopment_app1_postgres:
+    image: postgres:14
+    container_name: dockerize_devlopment_app1_postgres
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=sample password
+      - DATABASE_NAME=app_db
+      - DATABASE_USER=app_user
+      - DATABASE_PASSWORD=sample password
+    ports: 
+      - '5433:5432'
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U postgres"]
+      interval: 5s
+      timeout: 15s
+      retries: 20
+    volumes:
+      - ./local_dbdata/dev/postgres:/var/lib/postgresql/data
+      - ./database/postgres_database/setup_scripts/01-init.sh:/docker-entrypoint-initdb.d/01-init.sh
+    networks:
+      - dockerize_devlopment_app1_network
+  
+  dockerize_devlopment_app1_pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: dockerize_devlopment_app1_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: pgadmin@test.com
+      PGADMIN_DEFAULT_PASSWORD: sample password
+    ports:
+      - "8087:80"
+    depends_on:
+      - dockerize_devlopment_app1_postgres
+    networks:
+      - dockerize_devlopment_app1_network
+
+  dockerize_devlopment_app1_mysql:
+    build:
+      context: ./database/mysql_database
+      dockerfile: Dockerfile
+    container_name: dockerize_devlopment_app1_mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=sample password
+      - MYSQL_DATABASE=app_db
+      - MYSQL_USER=app_user
+      - MYSQL_PASSWORD=sample password
+    ports: 
+      - '3306:3306'
+    volumes:    
+      - ./local_dbdata/dev/mysql:/var/mysql      
+    networks:
+      - dockerize_devlopment_app1_network
+    
+  dockerize_devlopment_app1_phpadmin:
+    image: phpmyadmin/pypmyadmin
+    container_name: dockerize_devlopment_app1_phpadmin
+    environment:
+      PMA_HOST: dockerize_devlopment_app1_mysql
+      PMA_PORT: 3306
+    ports:
+      - "8088:80"
+    networks:
+      - dockerize_devlopment_app1_network
+
+  dockerize_devlopment_app1_sqlserver:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    container_name: dockerize_devlopment_app1_sqlserver
+    ports: 
+      - "1433:1433"
+    environment:
+      SA_PASSWORD: sample password
+      ACCEPT_EULA: "Y"
+    volumes:
+      - ./local_dbdata/dev/mssql/data:/var/opt/mssql/data/
+      - ./local_dbdata/dev/mssql/log:/var/opt/mssql/log
+      - ./local_dbdata/dev/mssql/secrets:/var/opt/mssql/secrets
+    networks:
+      - dockerize_devlopment_app1_network
+
+  dockerize_devlopment_app1_adminer:
+    image: adminer
+    container_name: dockerize_devlopment_app1_adminer
+    ports: 
+      - "8089:8080"
+    networks:
+      - dockerize_devlopment_app1_network
+
+  dockerize_devlopment_app1_app:
+    build:
+      context: .
+      args:
+        USER_NAME: $USER
+        USER_DISP_NAME: Your Name
+        USER_EMAIL: Your Email
+        USER_ID: get user id
+        GROUP_ID: get group id
+      dockerfile: Dockerfile-DevTeam
+    container_name: dockerize_devlopment_app1_app
+    environment:
+      MSSQL_SERVER: dockerize_devlopment_app1_sqlserver
+      MSSQL_PORT: 1433
+      MSSQL_USERNAME: sa
+      MSSQL_PASSWORD: sample password
+      MSSQL_DATABASE: app_db    
+      
+      POSTGRES_SERVER: dockerize_devlopment_app1_postgres
+      POSTGRES_PORT: 5433
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: sample password      
+      POSTGRES_DATABASE: postgres
+      POSTGRES_APP_USERNAME: app_user
+      POSTGRES_APP_PASSWORD: sample password
+      POSTGRES_APP_DATABASE: app_db
+      
+      MYSQL_SERVER: dockerize_devlopment_app1_mysql
+      MYSQL_ROOT_PASSWORD: sample password      
+      MYSQL_USER: app_user
+      MYSQL_PORT: 3306
+      MYSQL_USERNAME: app_user
+      MYSQL_PASSWORD: sample password
+      MYSQL_DATABASE: app_db    
+
+      REDIS_SERVER: dockerize_devlopment_app1_redis
+      REDIS_PORT: 6380
+      
+    ports: 
+      - "8091:8091"
+      - "8092:8092"
+      - "8093:8093"
+    volumes:
+      - .:/app
+      - $HOME/.ssh:/home/appuser/.ssh      
+    networks:
+      - dockerize_devlopment_app1_network
